@@ -83,77 +83,59 @@ void initmem(strategies strategy, size_t sz){
 
 void *mymalloc(size_t requested){
 	assert((int)myStrategy > 0);
-    struct memory_block *b = head;
+    struct memory_block *fit = head;
 
     switch (myStrategy){
         case NotSet:
             return NULL;
         case First:
-            while (b != NULL){
-                if (b->size >= requested && b->alloc == '0'){
-                    struct memory_block *newBlock = (struct memory_block*) malloc(sizeof (struct memory_block));
-                    int mem_block_is_head = b->prev == NULL, mem_block_is_tail = b->next == NULL;
 
+            while (fit != NULL){
+                // fit = find first fit (requested)
+                // newBlock = alloc block(fit, requested)
+                if (fit->size >= requested && fit->alloc == '0'){
+                    struct memory_block *newBlock = (struct memory_block*) malloc(sizeof (struct memory_block));
+                    int fit_is_head = fit->prev == NULL, fit_is_tail = fit->next == NULL, fit_is_empty_after_alloc = ((fit->size -= requested) == 0);
 
                     newBlock->size = requested;
                     newBlock->ptr = malloc(requested);
                     newBlock->alloc = '1';
 
-                    b->size -= requested;
-
-                    if (b->size == 0){
-                        puts("mem block empty\n");
-                        if (mem_block_is_head){
-                            if (b->next != NULL){
-                                newBlock->next = b->next;
-                                b->next->prev = newBlock;
+                    if (fit_is_empty_after_alloc){
+                        if (fit_is_head){
+                            if (fit->next != NULL){
+                                newBlock->next = fit->next;
+                                fit->next->prev = newBlock;
                             }
                             head = newBlock;
                         }
-                        else if (mem_block_is_tail){
-                            newBlock->prev = b->prev;
-                            b->prev->next = newBlock;
+                        else if (fit_is_tail){
+                            newBlock->prev = fit->prev;
+                            fit->prev->next = newBlock;
                         }
                         else {
-                            newBlock->prev = b->prev;
-                            b->prev->next = newBlock;
+                            newBlock->prev = fit->prev;
+                            fit->prev->next = newBlock;
 
-                            newBlock->next = b->next;
-                            b->next->prev = newBlock;
+                            newBlock->next = fit->next;
+                            fit->next->prev = newBlock;
                         }
-
                     }
                     else {
-                        puts("mem block not empty\n");
-                        if (mem_block_is_head){
-                            newBlock->prev = b;
+                        newBlock->prev = fit;
 
-                            if (b->next != NULL){
-                                b->next->prev = newBlock;
-                                newBlock->next = b->next;
-                            }
-                            b->next = newBlock;
+                        if (fit->next != NULL){
+                            fit->next->prev = newBlock;
+                            newBlock->next = fit->next;
                         }
-                        else if (mem_block_is_tail){
-                            newBlock->next = b;
 
-                            if (b->prev != NULL){
-                                b->prev->next = newBlock;
-                                newBlock->prev = b->prev;
-                            }
-                            b->prev = newBlock;
-                        }
-                        else {
-                            // place to the right of free block
-                            newBlock->prev = b;
-                            newBlock->next = b->next;
-                            b->next->prev = newBlock;
-                            b->next = newBlock;
-                        }
+                        fit->next = newBlock;
                     }
+
                     return newBlock->ptr;
+
                 }
-                b = b->next;
+                fit = fit->next;
             }
             return NULL;
 
@@ -178,6 +160,7 @@ void myfree(void* block){
             // TODO: update temp ptr with prev ptr and next ptr
             int flag = 0;
 
+            // free in front
             if (temp->next != NULL && temp->next->alloc == '0'){
                 struct memory_block *front = temp->next;
                 temp->size += front->size;
@@ -195,6 +178,7 @@ void myfree(void* block){
                 free(front->ptr);
             }
 
+            // free behind
             if (temp->prev != NULL && temp->prev->alloc == '0'){
                 struct memory_block *behind = temp->prev;
                 temp->size += behind->size;
@@ -213,6 +197,8 @@ void myfree(void* block){
             }
 
             if (flag == 2) head = temp;
+
+            free(temp->ptr);
 
             temp->alloc = '0';
             return;
@@ -365,19 +351,22 @@ strategies strategyFromString(char * strategy){
 void print_memory(){
     struct memory_block *temp = head;
 
+    /*
     while (temp != NULL){
-        printf("prev = %p (%p) next = %p || ", temp->prev, temp, temp->next);
+        printf("%p <- (%p) -> %p || ", temp->prev, temp, temp->next);
         temp = temp->next;
     }
+    */
+
     printf("\n");
 
     temp = head;
 
     while (temp != NULL){
-        printf("%d(%s) %s %s || ",temp->size, temp->alloc == '1' ? "alloc" : "free", temp->next != NULL ? "->" : "", temp->prev ? "<-" : "");
+        printf("%s %d(%s) %s", temp->prev ? "<-" : "null <-", temp->size, temp->alloc == '1' ? "alloc" : "free", temp->next != NULL ? "->" : "-> null");
         temp = temp->next;
     }
-    printf("\n");
+    printf("\n\n");
 }
 
 /* Use this function to track memory allocation performance.  
@@ -396,7 +385,7 @@ void print_memory_status(){
  */
 void try_mymem(int argc, char **argv) {
         strategies strat;
-	void *a, *b, *c, *d, *e, *f;
+	void *a, *b, *c, *d, *e, *f, *g, *h, *k, *l;
 	if(argc > 1)
 	  strat = strategyFromString(argv[1]);
 	else
@@ -408,24 +397,21 @@ void try_mymem(int argc, char **argv) {
 	
 	initmem(strat,500);
 	
-	a = mymalloc(90);
+	a = mymalloc(45);
 	b = mymalloc(100);
     c = mymalloc(310);
     myfree(b);
-    //myfree(a);
-	//myfree(c);
 	d = mymalloc(90);
-	//myfree(a);
-	e = mymalloc(10);
-	//f = mymalloc(190);
-	//myfree(c); // 110
-	//myfree(d); // 50
-	//myfree(e); // 150
+	e = mymalloc(5);
 	myfree(d);
+	g = mymalloc(90);
+
 	myfree(a);
-	myfree(c);
-	myfree(e);
-    // TODO: bug
+	h = mymalloc(41);
+	k = mymalloc(39);
+	myfree(g);
+	myfree(h);
+	l = mymalloc(142);
 
 	
 	print_memory();
