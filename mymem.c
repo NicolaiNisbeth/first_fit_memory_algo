@@ -363,7 +363,7 @@ void print_memory(){
     temp = head;
 
     while (temp != NULL){
-        printf("%s %d(%s) %s", temp->prev ? "<-" : "null <-", temp->size, temp->alloc == '1' ? "alloc" : "free", temp->next != NULL ? "->" : "-> null");
+        printf("%s %d(%s) %s", temp->prev ? "<-" : "NULL <-", temp->size, temp->alloc == '1' ? "alloc" : "free", temp->next != NULL ? "->" : "-> NULL");
         temp = temp->next;
     }
     printf("\n\n");
