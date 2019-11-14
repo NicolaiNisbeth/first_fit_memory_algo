@@ -92,21 +92,25 @@ void *mymalloc(size_t requested){
             while (b != NULL){
                 if (b->size >= requested && b->alloc == '0'){
                     struct memory_block *newBlock = (struct memory_block*) malloc(sizeof (struct memory_block));
+                    int mem_block_is_head = b->prev == NULL, mem_block_is_tail = b->next == NULL;
+
+
                     newBlock->size = requested;
                     newBlock->ptr = malloc(requested);
                     newBlock->alloc = '1';
 
                     b->size -= requested;
-                    int free_is_head = b->prev == NULL, free_is_tail = b->next == NULL;
 
                     if (b->size == 0){
-                        puts("empty\n");
-                        if (free_is_head){
-                            newBlock->next = b->next;
-                            b->next->prev = newBlock;
+                        puts("mem block empty\n");
+                        if (mem_block_is_head){
+                            if (b->next != NULL){
+                                newBlock->next = b->next;
+                                b->next->prev = newBlock;
+                            }
                             head = newBlock;
                         }
-                        else if (free_is_tail){
+                        else if (mem_block_is_tail){
                             newBlock->prev = b->prev;
                             b->prev->next = newBlock;
                         }
@@ -120,8 +124,8 @@ void *mymalloc(size_t requested){
 
                     }
                     else {
-                        puts("not empty\n");
-                        if (free_is_head){
+                        puts("mem block not empty\n");
+                        if (mem_block_is_head){
                             newBlock->prev = b;
 
                             if (b->next != NULL){
@@ -129,10 +133,8 @@ void *mymalloc(size_t requested){
                                 newBlock->next = b->next;
                             }
                             b->next = newBlock;
-
-
                         }
-                        else if (free_is_tail){
+                        else if (mem_block_is_tail){
                             newBlock->next = b;
 
                             if (b->prev != NULL){
@@ -142,13 +144,11 @@ void *mymalloc(size_t requested){
                             b->prev = newBlock;
                         }
                         else {
-                            puts("middle\n");
-                            // place to the left
-                            newBlock->prev = b->prev;
-                            newBlock->next = b;
-
-                            newBlock->prev->next = b;
-                            b->prev = newBlock;
+                            // place to the right of free block
+                            newBlock->prev = b;
+                            newBlock->next = b->next;
+                            b->next->prev = newBlock;
+                            b->next = newBlock;
                         }
                     }
                     return newBlock->ptr;
@@ -173,30 +173,46 @@ void myfree(void* block){
 
     struct memory_block *temp = head;
 
-    int c = 0;
     while (temp != NULL){
-        printf("%d\n", c++);
-
         if (temp->ptr == block){
-            printf("size %d\n", temp->size);
-
             // TODO: update temp ptr with prev ptr and next ptr
-
-            if (temp->prev != NULL & temp->prev->alloc == '0'){
-                puts("prev\n");
-                temp->size += temp->prev->size;
-                free(temp->prev->ptr);
-                temp->prev = temp->prev->prev;
-                temp->prev->next = temp;
-            }
+            int flag = 0;
 
             if (temp->next != NULL && temp->next->alloc == '0'){
-                puts("next\n");
-                temp->size += temp->next->size;
-                free(temp->next->ptr);
-                temp->next = temp->next->next;
-                temp->next->prev = temp;
+                struct memory_block *front = temp->next;
+                temp->size += front->size;
+                temp->ptr = realloc(temp->ptr, temp->size);
+
+                if (front->next != NULL){
+                    temp->next = front->next;
+                    front->next->prev = temp;
+                }
+                else {
+                    temp->next = NULL;
+                    flag++;
+                }
+
+                free(front->ptr);
             }
+
+            if (temp->prev != NULL && temp->prev->alloc == '0'){
+                struct memory_block *behind = temp->prev;
+                temp->size += behind->size;
+                temp->ptr = realloc(temp->ptr, temp->size);
+
+                if (behind->prev != NULL){
+                    temp->prev = behind->prev;
+                    behind->prev->next = temp;
+                }
+                else {
+                    temp->prev = NULL;
+                    flag++;
+                }
+
+                free(behind->ptr);
+            }
+
+            if (flag == 2) head = temp;
 
             temp->alloc = '0';
             return;
@@ -211,67 +227,6 @@ void myfree(void* block){
  * Implement these functions.
  * Note that when refered to "memory" here, it is meant that the 
  * memory pool this module manages via initmem/mymalloc/myfree. 
- */
-
-/*
-int main(void){
-
-    int blockSize[] = {100, 500, 200, 300, 600};
-    int processSize[] = {212, 417, 112, 426};
-    int m = sizeof(blockSize) / sizeof(blockSize[0]);
-    int n = sizeof(processSize) / sizeof(processSize[0]);
-
-    struct memory_block* first = NULL;
-    struct memory_block* second = NULL;
-    struct memory_block* third = NULL;
-    struct memory_block* fourth = NULL;
-    struct memory_block* fifth = NULL;
-
-    // allocate 3 nodes in the heap
-    first = (struct memory_block*) malloc(sizeof(struct memory_block));
-    second = (struct memory_block*) malloc(sizeof(struct memory_block));
-    third = (struct memory_block*) malloc(sizeof(struct memory_block));
-    fourth = (struct memory_block*) malloc(sizeof(struct memory_block));
-    fifth = (struct memory_block*) malloc(sizeof(struct memory_block));
-
-    first->size = blockSize[0];
-    first->alloc = '0';
-    first->next = second;
-    first->ptr = malloc(100 * 3);
-
-
-    second->size = blockSize[1];
-    second->alloc = '0';
-    second->next = third;
-    second->ptr = malloc(100 * 3);
-
-
-    third->size = blockSize[2];
-    third->alloc = '1';
-    third->next = fourth;
-    third->ptr = malloc(100 * 3);
-
-
-    fourth->size = blockSize[3];
-    fourth->alloc = '0';
-    fourth->next = fifth;
-    fourth->ptr = malloc(100 * 3);
-
-
-    fifth->size = blockSize[4];
-    fifth->alloc = '0';
-    fifth->ptr = malloc(100 * 3);
-
-
-    int result = mem_small_free(400);
-    printf("%d\n", result);
-
-    free(first->ptr);
-    free(second->ptr);
-    free(third->ptr);
-    free(fourth->ptr);
-    free(fifth->ptr);
-}
  */
 
 /* Get the number of contiguous areas of free space in memory. */
@@ -409,6 +364,15 @@ strategies strategyFromString(char * strategy){
 /* Use this function to print out the current contents of memory. */
 void print_memory(){
     struct memory_block *temp = head;
+
+    while (temp != NULL){
+        printf("prev = %p (%p) next = %p || ", temp->prev, temp, temp->next);
+        temp = temp->next;
+    }
+    printf("\n");
+
+    temp = head;
+
     while (temp != NULL){
         printf("%d(%s) %s %s || ",temp->size, temp->alloc == '1' ? "alloc" : "free", temp->next != NULL ? "->" : "", temp->prev ? "<-" : "");
         temp = temp->next;
@@ -446,15 +410,21 @@ void try_mymem(int argc, char **argv) {
 	
 	a = mymalloc(90);
 	b = mymalloc(100);
-	c = mymalloc(110);
-	myfree(b);
-	d = mymalloc(50);
-	myfree(a);
-	e = mymalloc(150);
-	f = mymalloc(190);
+    c = mymalloc(310);
+    myfree(b);
+    //myfree(a);
 	//myfree(c);
-	//myfree(d);
-	//myfree(e);
+	d = mymalloc(90);
+	//myfree(a);
+	e = mymalloc(10);
+	//f = mymalloc(190);
+	//myfree(c); // 110
+	//myfree(d); // 50
+	//myfree(e); // 150
+	myfree(d);
+	myfree(a);
+	myfree(c);
+	myfree(e);
     // TODO: bug
 
 	
