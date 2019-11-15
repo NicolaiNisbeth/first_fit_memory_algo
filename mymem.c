@@ -31,6 +31,7 @@ size_t mySize;
 
 void *myMemory = NULL;
 static struct memory_block *head;
+static struct memory_block *prev;
 
 /* initmem must be called prior to mymalloc and myfree.
 
@@ -57,10 +58,10 @@ void initmem(strategies strategy, size_t sz){
 	/* TODO: release any other memory you were using for bookkeeping when doing a re-initialization! */
 
 	while (head != NULL){
-	    head->size = 0;
-	    head->alloc = 0;
 	    free(head->ptr);
+	    prev = head;
 	    head = head->next;
+	    free(prev);
 	}
 
 
@@ -85,15 +86,14 @@ void initmem(strategies strategy, size_t sz){
 
 void *mymalloc(size_t requested){
     assert((int)myStrategy > 0);
-    struct memory_block *fit, *newBlock;
+    struct memory_block *fit;
 
     switch (myStrategy){
         case NotSet:
             return NULL;
         case First:
             fit = findFirstFit(requested);
-            newBlock = allocBlock(fit, requested);
-            return newBlock->ptr;
+            return allocBlock(fit, requested);
         case Best:
             return NULL;
         case Worst:
@@ -108,7 +108,7 @@ void *findFirstFit(size_t requested){
     struct memory_block *temp = head;
 
     while (temp != NULL){
-        if (temp->size >= requested && temp->alloc) return temp;
+        if (temp->size >= requested && temp->alloc == '0') return temp;
         temp = temp->next;
     }
 
@@ -116,13 +116,14 @@ void *findFirstFit(size_t requested){
 }
 
 void *allocBlock(struct memory_block *fit, size_t requested){
+    if (fit == NULL) return NULL;
     int fit_is_head = fit->prev == NULL, fit_is_tail = fit->next == NULL;
     int fit_is_empty_after_alloc = (fit->size -= requested) == 0;
 
     struct memory_block *newBlock = (struct memory_block*) malloc(sizeof (struct memory_block));
 
     newBlock->size = requested;
-    newBlock->ptr = malloc(requested);
+    newBlock->ptr = fit->ptr + requested;
     newBlock->alloc = '1';
 
     if (fit_is_empty_after_alloc){
@@ -131,6 +132,7 @@ void *allocBlock(struct memory_block *fit, size_t requested){
                 newBlock->next = fit->next;
                 fit->next->prev = newBlock;
             }
+            newBlock->ptr = myMemory;
             head = newBlock;
         }
         else if (fit_is_tail){
@@ -146,17 +148,25 @@ void *allocBlock(struct memory_block *fit, size_t requested){
         }
     }
     else {
-        newBlock->prev = fit;
+        // alloc to the left of free block
 
-        if (fit->next != NULL){
-            fit->next->prev = newBlock;
-            newBlock->next = fit->next;
+        newBlock->next = fit;
+
+        if (fit->prev != NULL){
+            newBlock->prev = fit->prev;
+            fit->prev->next = newBlock;
+        }
+        else {
+            // free is head
+            newBlock->prev = NULL;
+            newBlock->ptr = myMemory;
+            head = newBlock;
         }
 
-        fit->next = newBlock;
+        fit->prev = newBlock;
     }
 
-    return newBlock;
+    return newBlock->ptr;
 }
 
 
@@ -200,6 +210,8 @@ void myfree(void* block){
                 else {
                     index->prev = NULL;
                     flag++;
+                    index->ptr = myMemory;
+                    head = index;
                 }
 
                 free(prevFree->ptr), free(prevFree);
@@ -207,7 +219,11 @@ void myfree(void* block){
 
             index->alloc = '0';
 
-            if (flag == 2) head = index;
+            if (flag == 2){
+                printf("flag\n");
+                index->ptr = myMemory;
+                head = index;
+            }
 
             return;
         }
@@ -356,12 +372,12 @@ strategies strategyFromString(char * strategy){
 void print_memory(){
     struct memory_block *temp = head;
 
-    /*
+
     while (temp != NULL){
         printf("%p <- (%p) -> %p || ", temp->prev, temp, temp->next);
         temp = temp->next;
     }
-    */
+
 
     printf("\n");
 
@@ -405,26 +421,31 @@ void try_mymem(int argc, char **argv) {
 	
 	initmem(strat,500);
 	
-	a = mymalloc(45);
-	b = mymalloc(100);
-    c = mymalloc(310);
-    myfree(b);
+	a = mymalloc(100);
+	b = mymalloc(50);
+    //c = mymalloc(355);
+    //myfree(b);
     //myfree(a);
     //myfree(c);
-	d = mymalloc(90);
-	e = mymalloc(5);
-	myfree(d);
-    myfree(a);
-    myfree(c);
-    myfree(e);
+	//d = mymalloc(90);
+	//e = mymalloc(5);
+	//myfree(a);
+    //myfree(d);
+    //myfree(c);
+    //myfree(e);
 	//g = mymalloc(90);
 
 	//myfree(a);
 	//h = mymalloc(41);
 	//k = mymalloc(39);
+	//myfree(k);
 	//myfree(g);
-	//myfree(h);
-	//l = mymalloc(142);
+    //myfree(h);
+    //e = mymalloc(5);
+    //f = mymalloc(495);
+    //myfree(e);
+
+    //l = mymalloc(142);
 
 	
 	print_memory();
