@@ -18,6 +18,7 @@ void initmem(strategies strategy, size_t sz);
 void *mymalloc(size_t requested);
 void myfree(void* block);
 
+
 int mem_holes();
 int mem_allocated();
 int mem_free();

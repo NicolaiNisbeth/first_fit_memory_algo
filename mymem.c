@@ -23,6 +23,8 @@ struct memory_block {
     void *ptr;           // location of block in memory pool.
 };
 
+void *findFirstFit(size_t requested);
+void *allocBlock(struct memory_block *fit, size_t requested);
 
 strategies myStrategy = First   ;    // Current strategy
 size_t mySize;
@@ -82,129 +84,135 @@ void initmem(strategies strategy, size_t sz){
  */
 
 void *mymalloc(size_t requested){
-	assert((int)myStrategy > 0);
-    struct memory_block *fit = head;
+    assert((int)myStrategy > 0);
+    struct memory_block *fit, *newBlock;
 
     switch (myStrategy){
         case NotSet:
             return NULL;
         case First:
-
-            while (fit != NULL){
-                // fit = find first fit (requested)
-                // newBlock = alloc block(fit, requested)
-                if (fit->size >= requested && fit->alloc == '0'){
-                    struct memory_block *newBlock = (struct memory_block*) malloc(sizeof (struct memory_block));
-                    int fit_is_head = fit->prev == NULL, fit_is_tail = fit->next == NULL, fit_is_empty_after_alloc = ((fit->size -= requested) == 0);
-
-                    newBlock->size = requested;
-                    newBlock->ptr = malloc(requested);
-                    newBlock->alloc = '1';
-
-                    if (fit_is_empty_after_alloc){
-                        if (fit_is_head){
-                            if (fit->next != NULL){
-                                newBlock->next = fit->next;
-                                fit->next->prev = newBlock;
-                            }
-                            head = newBlock;
-                        }
-                        else if (fit_is_tail){
-                            newBlock->prev = fit->prev;
-                            fit->prev->next = newBlock;
-                        }
-                        else {
-                            newBlock->prev = fit->prev;
-                            fit->prev->next = newBlock;
-
-                            newBlock->next = fit->next;
-                            fit->next->prev = newBlock;
-                        }
-                    }
-                    else {
-                        newBlock->prev = fit;
-
-                        if (fit->next != NULL){
-                            fit->next->prev = newBlock;
-                            newBlock->next = fit->next;
-                        }
-
-                        fit->next = newBlock;
-                    }
-
-                    return newBlock->ptr;
-
-                }
-                fit = fit->next;
-            }
+            fit = findFirstFit(requested);
+            newBlock = allocBlock(fit, requested);
+            return newBlock->ptr;
+        case Best:
             return NULL;
-
-	  case Best:
-	            return NULL;
-	  case Worst:
-	            return NULL;
-	  case Next:
-	            return NULL;
-	}
-	return NULL;
+        case Worst:
+            return NULL;
+        case Next:
+            return NULL;
+    }
+    return NULL;
 }
+
+void *findFirstFit(size_t requested){
+    struct memory_block *temp = head;
+
+    while (temp != NULL){
+        if (temp->size >= requested && temp->alloc) return temp;
+        temp = temp->next;
+    }
+
+    return NULL;
+}
+
+void *allocBlock(struct memory_block *fit, size_t requested){
+    int fit_is_head = fit->prev == NULL, fit_is_tail = fit->next == NULL;
+    int fit_is_empty_after_alloc = (fit->size -= requested) == 0;
+
+    struct memory_block *newBlock = (struct memory_block*) malloc(sizeof (struct memory_block));
+
+    newBlock->size = requested;
+    newBlock->ptr = malloc(requested);
+    newBlock->alloc = '1';
+
+    if (fit_is_empty_after_alloc){
+        if (fit_is_head){
+            if (fit->next != NULL){
+                newBlock->next = fit->next;
+                fit->next->prev = newBlock;
+            }
+            head = newBlock;
+        }
+        else if (fit_is_tail){
+            newBlock->prev = fit->prev;
+            fit->prev->next = newBlock;
+        }
+        else {
+            newBlock->prev = fit->prev;
+            fit->prev->next = newBlock;
+
+            newBlock->next = fit->next;
+            fit->next->prev = newBlock;
+        }
+    }
+    else {
+        newBlock->prev = fit;
+
+        if (fit->next != NULL){
+            fit->next->prev = newBlock;
+            newBlock->next = fit->next;
+        }
+
+        fit->next = newBlock;
+    }
+
+    return newBlock;
+}
+
 
 
 /* Frees a block of memory previously allocated by mymalloc. */
 void myfree(void* block){
+    struct memory_block *index = head;
 
-    struct memory_block *temp = head;
-
-    while (temp != NULL){
-        if (temp->ptr == block){
-            // TODO: update temp ptr with prev ptr and next ptr
+    while (index != NULL){
+        if (index->ptr == block){
+            int hasNextFree = index->next != NULL && index->next->alloc == '0';
+            int hasPrevFree = index->prev != NULL && index->prev->alloc == '0';
             int flag = 0;
 
-            // free in front
-            if (temp->next != NULL && temp->next->alloc == '0'){
-                struct memory_block *front = temp->next;
-                temp->size += front->size;
-                temp->ptr = realloc(temp->ptr, temp->size);
+            if (hasNextFree){
+                struct memory_block *nextFree = index->next;
+                index->size += nextFree->size;
+                index->ptr = malloc(index->size);
 
-                if (front->next != NULL){
-                    temp->next = front->next;
-                    front->next->prev = temp;
+                if (nextFree->next != NULL){
+                    index->next = nextFree->next;
+                    nextFree->next->prev = index;
                 }
                 else {
-                    temp->next = NULL;
+                    index->next = NULL;
                     flag++;
                 }
 
-                free(front->ptr);
+                free(nextFree->ptr), free(nextFree);
             }
 
-            // free behind
-            if (temp->prev != NULL && temp->prev->alloc == '0'){
-                struct memory_block *behind = temp->prev;
-                temp->size += behind->size;
-                temp->ptr = realloc(temp->ptr, temp->size);
+            if (hasPrevFree){
+                struct memory_block *prevFree = index->prev;
+                index->size += prevFree->size;
+                index->ptr = malloc(index->size);
 
-                if (behind->prev != NULL){
-                    temp->prev = behind->prev;
-                    behind->prev->next = temp;
+                if (prevFree->prev != NULL){
+                    index->prev = prevFree->prev;
+                    prevFree->prev->next = index;
                 }
                 else {
-                    temp->prev = NULL;
+                    index->prev = NULL;
                     flag++;
                 }
 
-                free(behind->ptr);
+                free(prevFree->ptr), free(prevFree);
             }
 
-            if (flag == 2) head = temp;
+            index->alloc = '0';
 
-            free(temp->ptr);
+            if (flag == 2) head = index;
 
-            temp->alloc = '0';
             return;
         }
 
-        temp = temp->next;
+        index = index->next;
     }
 
 }
@@ -217,14 +225,14 @@ void myfree(void* block){
 
 /* Get the number of contiguous areas of free space in memory. */
 int mem_holes(){
-    int holes = 0;
+    int free_space = 0;
     struct memory_block *temp = head;
 
     while (temp != NULL){
-        if (temp->alloc == '0') holes++;
+        if (temp->alloc == '0') free_space++;
         temp = temp->next;
     }
-    return holes;
+    return free_space;
 }
 
 /* Get the number of bytes allocated */
@@ -269,14 +277,13 @@ int mem_largest_free(){
 
 /* Number of free blocks smaller than "size" bytes. */
 int mem_small_free(int size){
-    int blocks = 0;
+    int free_blocks = 0;
     struct memory_block *temp = head;
     while (temp != NULL){
-        if (temp->alloc == '0' && temp->size < size) blocks++;
+        if (temp->alloc == '0' && temp->size < size) free_blocks++;
         temp = temp->next;
     }
-    return blocks;
-
+    return free_blocks;
 }
 
 /* Is a particular byte allocated or not */
@@ -294,7 +301,6 @@ char mem_is_alloc(void *ptr){
  * The test code uses them, but you may find them useful.
  */
 
-
 //Returns a pointer to the memory pool.
 void *mem_pool(){
 	return myMemory;
@@ -304,7 +310,6 @@ void *mem_pool(){
 int mem_total(){
 	return mySize;
 }
-
 
 // Get string name for a strategy. 
 char *strategy_name(strategies strategy){
@@ -363,7 +368,10 @@ void print_memory(){
     temp = head;
 
     while (temp != NULL){
-        printf("%s %d(%s) %s", temp->prev ? "<-" : "NULL <-", temp->size, temp->alloc == '1' ? "alloc" : "free", temp->next != NULL ? "->" : "-> NULL");
+        printf("%s %d(%s) %s", temp->prev != NULL ? "<-" : "NULL <-",
+                                      temp->size,
+                                      temp->alloc == '1' ? "alloc" : "free",
+                                      temp->next != NULL ? "->" : "-> NULL");
         temp = temp->next;
     }
     printf("\n\n");
@@ -401,17 +409,22 @@ void try_mymem(int argc, char **argv) {
 	b = mymalloc(100);
     c = mymalloc(310);
     myfree(b);
+    //myfree(a);
+    //myfree(c);
 	d = mymalloc(90);
 	e = mymalloc(5);
 	myfree(d);
-	g = mymalloc(90);
+    myfree(a);
+    myfree(c);
+    myfree(e);
+	//g = mymalloc(90);
 
-	myfree(a);
-	h = mymalloc(41);
-	k = mymalloc(39);
-	myfree(g);
-	myfree(h);
-	l = mymalloc(142);
+	//myfree(a);
+	//h = mymalloc(41);
+	//k = mymalloc(39);
+	//myfree(g);
+	//myfree(h);
+	//l = mymalloc(142);
 
 	
 	print_memory();
