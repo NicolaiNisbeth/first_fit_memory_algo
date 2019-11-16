@@ -60,6 +60,7 @@ void initmem(strategies strategy, size_t sz){
 
 	myMemory = malloc(sz);
 
+    // taken from Armandas Rokas
     head = (struct memory_block*) malloc(sizeof (struct memory_block));
     head->prev = NULL;
     head->next = NULL;
@@ -110,9 +111,9 @@ void *allocBlock(struct memory_block *fit, size_t requested){
 
     if (memo_remainder > 0){
         struct memory_block *freeBlock = (struct memory_block*) malloc(sizeof (struct memory_block));
+        freeBlock->ptr = fit->ptr + requested; // ensures correct offset
         freeBlock->size = memo_remainder;
         freeBlock->alloc = '0';
-        freeBlock->ptr = fit->ptr + requested; // ensures correct offset
 
         // position freeBlock to the right of fit
         freeBlock->prev = fit;
