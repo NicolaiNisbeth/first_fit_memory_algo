@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include "mymem.h"
-#include <time.h>
 #define MATH_MAX(a, b) ((a > b) ? a : b)
 
 
@@ -11,27 +10,25 @@
 /* The main structure for implementing memory allocation.
  * You may change this to fit your implementation.
  */
-
 struct memory_block {
     // doubly-linked list
     struct memory_block *prev;
     struct memory_block *next;
 
-    int size;            // How many bytes in this block?
-    char alloc;          // 1 if this block is allocated,
-    // 0 if this block is free.
-    void *ptr;           // location of block in memory pool.
+    int size;               // Bytes in block
+    char alloc;             // 1 if allocated, 0 if free.
+    void *ptr;              // location of block in memory pool.
 };
-
-void *findFirstFit(size_t requested);
-void *allocBlock(struct memory_block *fit, size_t requested);
 
 strategies myStrategy = First   ;    // Current strategy
 size_t mySize;
 
 void *myMemory = NULL;
 static struct memory_block *head;
-static struct memory_block *prev;
+static struct memory_block *temp;
+
+void *findFirstFit(size_t requested);
+void *allocBlock(struct memory_block *fit, size_t requested);
 
 /* initmem must be called prior to mymalloc and myfree.
 
@@ -53,29 +50,22 @@ void initmem(strategies strategy, size_t sz){
 	/* all implementations will need an actual block of memory to use */
 	mySize = sz;
 
-	if (myMemory != NULL) free(myMemory); /* in case this is not the first time initmem2 is called */
+    if (myMemory != NULL) free(myMemory); /* in case this is not the first time initmem2 is called */
 
-	/* TODO: release any other memory you were using for bookkeeping when doing a re-initialization! */
-
-	while (head != NULL){
-	    free(head->ptr);
-	    prev = head;
-	    head = head->next;
-	    free(prev);
-	}
-
+    while (head != NULL){
+        temp = head;
+        head = head->next;
+        free(temp);
+    }
 
 	myMemory = malloc(sz);
-	
-	/* TODO: Initialize memory management structure. */
-
 
     head = (struct memory_block*) malloc(sizeof (struct memory_block));
     head->prev = NULL;
     head->next = NULL;
-    head->size = sz; // initialy the first block size is equals to the memory pool size.
-    head->alloc = '0';  // not allocated
-    head->ptr = myMemory;  // points to the same memory adress as the memory pool
+    head->size = sz;
+    head->alloc = '0';
+    head->ptr = myMemory;  // points to the same memory address as the memory pool
 }
 
 /* Allocate a block of memory with the requested size.
@@ -105,132 +95,77 @@ void *mymalloc(size_t requested){
 }
 
 void *findFirstFit(size_t requested){
-    struct memory_block *temp = head;
-
+    temp = head;
     while (temp != NULL){
-        if (temp->size >= requested && temp->alloc == '0') return temp;
+        if (temp->alloc == '0' && temp->size >= requested) return temp;
         temp = temp->next;
     }
-
     return NULL;
 }
 
 void *allocBlock(struct memory_block *fit, size_t requested){
     if (fit == NULL) return NULL;
-    int fit_is_head = fit->prev == NULL, fit_is_tail = fit->next == NULL;
-    int fit_is_empty_after_alloc = (fit->size -= requested) == 0;
 
-    struct memory_block *newBlock = (struct memory_block*) malloc(sizeof (struct memory_block));
+    int memo_remainder = fit->size - (int)requested;
 
-    newBlock->size = requested;
-    newBlock->ptr = fit->ptr + requested;
-    newBlock->alloc = '1';
+    if (memo_remainder > 0){
+        struct memory_block *freeBlock = (struct memory_block*) malloc(sizeof (struct memory_block));
+        freeBlock->size = memo_remainder;
+        freeBlock->alloc = '0';
+        freeBlock->ptr = fit->ptr + requested; // ensures correct offset
 
-    if (fit_is_empty_after_alloc){
-        if (fit_is_head){
-            if (fit->next != NULL){
-                newBlock->next = fit->next;
-                fit->next->prev = newBlock;
-            }
-            newBlock->ptr = myMemory;
-            head = newBlock;
-        }
-        else if (fit_is_tail){
-            newBlock->prev = fit->prev;
-            fit->prev->next = newBlock;
-        }
-        else {
-            newBlock->prev = fit->prev;
-            fit->prev->next = newBlock;
+        // position freeBlock to the right of fit
+        freeBlock->prev = fit;
+        freeBlock->next = fit->next;
 
-            newBlock->next = fit->next;
-            fit->next->prev = newBlock;
-        }
-    }
-    else {
-        // alloc to the left of free block
+        if (fit->next != NULL)
+            fit->next->prev = freeBlock;
 
-        newBlock->next = fit;
-
-        if (fit->prev != NULL){
-            newBlock->prev = fit->prev;
-            fit->prev->next = newBlock;
-        }
-        else {
-            // free is head
-            newBlock->prev = NULL;
-            newBlock->ptr = myMemory;
-            head = newBlock;
-        }
-
-        fit->prev = newBlock;
+        fit->next = freeBlock;
     }
 
-    return newBlock->ptr;
+    fit->alloc = '1';
+    fit->size = requested;
+    return fit->ptr;
 }
-
-
 
 /* Frees a block of memory previously allocated by mymalloc. */
 void myfree(void* block){
-    struct memory_block *index = head;
+    temp = head;
 
-    while (index != NULL){
-        if (index->ptr == block){
-            int hasNextFree = index->next != NULL && index->next->alloc == '0';
-            int hasPrevFree = index->prev != NULL && index->prev->alloc == '0';
-            int flag = 0;
+    while (temp != NULL){
+        if (temp->ptr == block){
+            int nextBlockIsFree = (temp->next != NULL) && (temp->next->alloc == '0');
+            int prevBlockIsFree = (temp->prev != NULL) && (temp->prev->alloc == '0');
 
-            if (hasNextFree){
-                struct memory_block *nextFree = index->next;
-                index->size += nextFree->size;
-                index->ptr = malloc(index->size);
+            if (nextBlockIsFree){
+                struct memory_block *nextFree = temp->next;
+                temp->size += nextFree->size;
 
-                if (nextFree->next != NULL){
-                    index->next = nextFree->next;
-                    nextFree->next->prev = index;
-                }
-                else {
-                    index->next = NULL;
-                    flag++;
-                }
+                // change pointers to skip the node to be freed
+                temp->next = nextFree->next;
+                if (nextFree->next != NULL) nextFree->next->prev = temp;
 
-                free(nextFree->ptr), free(nextFree);
+                free(nextFree);
             }
 
-            if (hasPrevFree){
-                struct memory_block *prevFree = index->prev;
-                index->size += prevFree->size;
-                index->ptr = malloc(index->size);
+            if (prevBlockIsFree){
+                struct memory_block *prevFree = temp->prev;
+                temp->size += prevFree->size;
 
-                if (prevFree->prev != NULL){
-                    index->prev = prevFree->prev;
-                    prevFree->prev->next = index;
-                }
-                else {
-                    index->prev = NULL;
-                    flag++;
-                    index->ptr = myMemory;
-                    head = index;
-                }
+                // change pointers to skip the node to be freed
+                temp->prev = prevFree->prev;
+                if (prevFree->prev != NULL) prevFree->prev->next = temp;
+                else head = temp;
 
-                free(prevFree->ptr), free(prevFree);
+                free(prevFree);
             }
 
-            index->alloc = '0';
-
-            if (flag == 2){
-                printf("flag\n");
-                index->ptr = myMemory;
-                head = index;
-            }
-
+            temp->alloc = '0';
             return;
         }
-
-        index = index->next;
+        temp = temp->next;
     }
-
 }
 
 /****** Memory status/property functions ******
@@ -241,24 +176,21 @@ void myfree(void* block){
 
 /* Get the number of contiguous areas of free space in memory. */
 int mem_holes(){
-    int free_space = 0;
-    struct memory_block *temp = head;
-
+    int holes = 0;
+    temp = head;
     while (temp != NULL){
-        if (temp->alloc == '0') free_space++;
+        if (temp->alloc == '0') holes++;
         temp = temp->next;
     }
-    return free_space;
+    return holes;
 }
 
 /* Get the number of bytes allocated */
 int mem_allocated(){
     int bytes = 0;
-    struct memory_block *temp = head;
+    temp = head;
     while (temp != NULL){
-        if (temp->alloc == '1'){
-            bytes += temp->size;
-        }
+        if (temp->alloc == '1') bytes += temp->size;
         temp = temp->next;
     }
     return bytes;
@@ -267,7 +199,7 @@ int mem_allocated(){
 /* Number of non-allocated bytes */
 int mem_free(){
     int bytes = 0;
-    struct memory_block *temp = head;
+    temp = head;
     while (temp != NULL){
         if (temp->alloc == '0') bytes += temp->size;
         temp = temp->next;
@@ -278,8 +210,7 @@ int mem_free(){
 /* Number of bytes in the largest contiguous area of unallocated memory */
 int mem_largest_free(){
     int current = 0, max = 0;
-    struct memory_block *temp = head;
-
+    temp = head;
     while (temp != NULL){
         if (temp->alloc == '0') current += temp->size;
         else {
@@ -294,9 +225,9 @@ int mem_largest_free(){
 /* Number of free blocks smaller than "size" bytes. */
 int mem_small_free(int size){
     int free_blocks = 0;
-    struct memory_block *temp = head;
+    temp = head;
     while (temp != NULL){
-        if (temp->alloc == '0' && temp->size < size) free_blocks++;
+        if (temp->alloc == '0' && temp->size <= size) free_blocks++;
         temp = temp->next;
     }
     return free_blocks;
@@ -304,9 +235,9 @@ int mem_small_free(int size){
 
 /* Is a particular byte allocated or not */
 char mem_is_alloc(void *ptr){
-    struct memory_block *temp = head;
+    temp = head;
     while (temp != NULL){
-        if (temp->ptr == ptr)return '1';
+        if (temp->ptr == ptr) return '1';
         temp = temp->next;
     }
     return '0';
@@ -370,19 +301,15 @@ strategies strategyFromString(char * strategy){
 
 /* Use this function to print out the current contents of memory. */
 void print_memory(){
-    struct memory_block *temp = head;
-
-
+    /*
+    temp = head;
     while (temp != NULL){
-        printf("%p <- (%p) -> %p || ", temp->prev, temp, temp->next);
+        printf("%p <- (%p)%d -> %p || ", temp->prev, temp, temp->size, temp->next);
         temp = temp->next;
     }
-
-
+     */
     printf("\n");
-
     temp = head;
-
     while (temp != NULL){
         printf("%s %d(%s) %s", temp->prev != NULL ? "<-" : "NULL <-",
                                       temp->size,
@@ -418,36 +345,32 @@ void try_mymem(int argc, char **argv) {
 	
 	/* A simple example.  
 	   Each algorithm should produce a different layout. */
-	
-	initmem(strat,500);
-	
-	a = mymalloc(100);
-	b = mymalloc(50);
-    //c = mymalloc(355);
-    //myfree(b);
+
+    initmem(strat,1000);
+
+    a = mymalloc(10);
+    b = mymalloc(2);
+    myfree(a);
+    c = mymalloc(1);
+    myfree(c);
+	d = mymalloc(3);
+    e = mymalloc(1);
+    myfree(d);
+    myfree(e);
+    g = mymalloc(90);
     //myfree(a);
-    //myfree(c);
-	//d = mymalloc(90);
-	//e = mymalloc(5);
-	//myfree(a);
-    //myfree(d);
-    //myfree(c);
-    //myfree(e);
-	//g = mymalloc(90);
-
-	//myfree(a);
-	//h = mymalloc(41);
-	//k = mymalloc(39);
-	//myfree(k);
-	//myfree(g);
+    h = mymalloc(41);
+    k = mymalloc(39);
+    //myfree(k);
+    myfree(g);
     //myfree(h);
-    //e = mymalloc(5);
-    //f = mymalloc(495);
+    f = mymalloc(495);
     //myfree(e);
 
-    //l = mymalloc(142);
+    l = mymalloc(142);
 
-	
+    myfree(b);
+
 	print_memory();
 	print_memory_status();
 	
