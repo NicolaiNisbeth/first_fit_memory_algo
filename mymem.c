@@ -5,8 +5,6 @@
 #include "mymem.h"
 #define MATH_MAX(a, b) ((a > b) ? a : b)
 
-
-
 /* The main structure for implementing memory allocation.
  * You may change this to fit your implementation.
  */

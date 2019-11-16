@@ -1,0 +1,5 @@
+For implementation of initmem(...)
+https://github.com/ArmandasRokas/dtu_notes/wiki/ass3_manual
+
+For understanding the first fit algorithm
+https://www.geeksforgeeks.org/program-first-fit-algorithm-memory-management/
