@@ -59,8 +59,10 @@ void initmem(strategies strategy, size_t sz){
         head = head->next;
         free(temp);
     }
+    lastAlloc = NULL;
 
-	myMemory = malloc(sz);
+
+    myMemory = malloc(sz);
 
     // taken from Armandas Rokas
     head = (struct memory_block*) malloc(sizeof (struct memory_block));
@@ -96,8 +98,9 @@ void *mymalloc(size_t requested){
         case Next:
             fit = findNextFit(requested);
             return allocBlock(fit, requested);
+        default:
+            return NULL;
     }
-    return NULL;
 }
 
 void *findFirstFit(size_t requested){
@@ -142,7 +145,7 @@ void *findWorstFit(size_t requested){
 // TODO: bug
 void *findNextFit(size_t requested){
     if (lastAlloc != NULL) {
-        temp = lastAlloc;
+        temp = lastAlloc->next;
 
         // traverse from lastAlloc till end
         while (temp != NULL){
@@ -187,8 +190,7 @@ void *allocBlock(struct memory_block *fit, size_t requested){
     fit->alloc = '1';
     fit->size = requested;
 
-    lastAlloc = fit->next;
-
+    lastAlloc = fit;
 
     return fit->ptr;
 }
@@ -404,7 +406,7 @@ void try_mymem(int argc, char **argv) {
 	if(argc > 1)
 	  strat = strategyFromString(argv[1]);
 	else
-	  strat = First;
+	  strat = Next;
 	
 	
 	/* A simple example.  
@@ -425,8 +427,8 @@ void try_mymem(int argc, char **argv) {
 
     myfree(a);
 
-    g = mymalloc(10);
-    h = mymalloc(10);
+    g = mymalloc(100);
+    h = mymalloc(5);
 
     /*
     a = mymalloc(10);
