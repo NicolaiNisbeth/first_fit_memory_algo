@@ -24,8 +24,12 @@ size_t mySize;
 void *myMemory = NULL;
 static struct memory_block *head;
 static struct memory_block *temp;
+static struct memory_block *lastAlloc;
 
 void *findFirstFit(size_t requested);
+void *findBestFit(size_t requested);
+void *findWorstFit(size_t requested);
+void *findNextFit(size_t requested);
 void *allocBlock(struct memory_block *fit, size_t requested);
 
 /* initmem must be called prior to mymalloc and myfree.
@@ -84,11 +88,14 @@ void *mymalloc(size_t requested){
             fit = findFirstFit(requested);
             return allocBlock(fit, requested);
         case Best:
-            return NULL;
+            fit = findBestFit(requested);
+            return allocBlock(fit, requested);
         case Worst:
-            return NULL;
+            fit = findWorstFit(requested);
+            return allocBlock(fit, requested);
         case Next:
-            return NULL;
+            fit = findNextFit(requested);
+            return allocBlock(fit, requested);
     }
     return NULL;
 }
@@ -101,6 +108,60 @@ void *findFirstFit(size_t requested){
     }
     return NULL;
 }
+
+void *findBestFit(size_t requested){
+    temp = head;
+    struct memory_block *best = NULL;
+
+    while (temp != NULL){
+        if (temp->alloc == '0' && temp->size >= requested){
+            if (best == NULL) best = temp;
+
+            if (temp->size < best->size) best = temp;
+        }
+        temp = temp->next;
+    }
+    return best;
+}
+
+void *findWorstFit(size_t requested){
+    temp = head;
+    struct memory_block *worst = NULL;
+
+    while (temp != NULL){
+        if (temp->alloc == '0' && temp->size >= requested){
+            if (worst == NULL) worst = temp;
+
+            if (temp->size > worst->size) worst = temp;
+        }
+        temp = temp->next;
+    }
+    return worst;
+}
+
+// TODO: bug
+void *findNextFit(size_t requested){
+    if (lastAlloc != NULL) {
+        temp = lastAlloc;
+
+        // traverse from lastAlloc till end
+        while (temp != NULL){
+            if (temp->alloc == '0' && temp->size >= requested) return temp;
+            temp = temp->next;
+        }
+    }
+
+    temp = head;
+
+    // traverse from head till lastAlloc
+    while (temp != lastAlloc){
+        if (temp->alloc == '0' && temp->size >= requested) return temp;
+        temp = temp->next;
+    }
+
+    return NULL;
+}
+
 
 void *allocBlock(struct memory_block *fit, size_t requested){
     if (fit == NULL) return NULL;
@@ -125,6 +186,10 @@ void *allocBlock(struct memory_block *fit, size_t requested){
 
     fit->alloc = '1';
     fit->size = requested;
+
+    lastAlloc = fit->next;
+
+
     return fit->ptr;
 }
 
@@ -348,6 +413,23 @@ void try_mymem(int argc, char **argv) {
     initmem(strat,1000);
 
     a = mymalloc(10);
+    b = mymalloc(20);
+    c = mymalloc(30);
+    d = mymalloc(100);
+    e = mymalloc(840);
+
+    myfree(b);
+    myfree(d);
+
+    f = mymalloc(20);
+
+    myfree(a);
+
+    g = mymalloc(10);
+    h = mymalloc(10);
+
+    /*
+    a = mymalloc(10);
     b = mymalloc(2);
     myfree(a);
     c = mymalloc(1);
@@ -369,6 +451,7 @@ void try_mymem(int argc, char **argv) {
     l = mymalloc(142);
 
     myfree(b);
+     */
 
 	print_memory();
 	print_memory_status();
