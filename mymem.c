@@ -53,8 +53,7 @@ void initmem(strategies strategy, size_t sz){
 	mySize = sz;
 
     if (myMemory != NULL) free(myMemory);
-    if(lastAlloc == NULL) free(lastAlloc);
-    lastAlloc = NULL;
+    if (lastAlloc != NULL) lastAlloc = NULL;
 
     myMemory = malloc(sz);
 
