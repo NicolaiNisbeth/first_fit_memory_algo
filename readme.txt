@@ -8,9 +8,9 @@ User manual
 
 The application is implemented in the programming language C (version C11) and is intended for Unix systems.
 
-I was given the task to implement the first fit algorithm.
+I was given the task to implement the first fit algorithm, however I have implemented all four.
 The implementation utilizes the data structure memory_block - designed by Bhupjit - for implementing memory allocation.
-I have written two methods:
+I have written two methods for first fit:
     (1) findFirstFit(...) loops through the double linked list to find the first block that is free and equal or
     bigger than the requested size.
     (2) allocBlock(...) allocates the requested memory in the free block returned by findFirstFit(...).
@@ -31,3 +31,9 @@ NULL <- 70(free) <-> 50(alloc) <-> 200(alloc) <-> 100(free)
 NULL <- 120(free) <-> 200(alloc) <-> 100(free) -> NULL          // myfree(50), 50 as arg is for illustration purposes.
 NULL <- 400(free) -> NULL                                       // myfree(200)
 
+If you wish to try the other algorithms, then feel free to do so by using below commands:
+./mem -test all best
+./mem -test all worst
+./mem -test all next
+The different algorithms performance can be viewed in the file tests.log after execution the command:
+./mem -test all all
