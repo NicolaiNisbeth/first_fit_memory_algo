@@ -30,3 +30,4 @@ Furthermore my implementation handles subsequent free blocks by merging them. An
 NULL <- 70(free) <-> 50(alloc) <-> 200(alloc) <-> 100(free)
 NULL <- 120(free) <-> 200(alloc) <-> 100(free) -> NULL          // myfree(50), 50 as arg is for illustration purposes.
 NULL <- 400(free) -> NULL                                       // myfree(200)
+

@@ -52,15 +52,9 @@ void initmem(strategies strategy, size_t sz){
 	/* all implementations will need an actual block of memory to use */
 	mySize = sz;
 
-    if (myMemory != NULL) free(myMemory); /* in case this is not the first time initmem2 is called */
-
-    while (head != NULL){
-        temp = head;
-        head = head->next;
-        free(temp);
-    }
+    if (myMemory != NULL) free(myMemory);
+    if(lastAlloc == NULL) free(lastAlloc);
     lastAlloc = NULL;
-
 
     myMemory = malloc(sz);
 
@@ -87,20 +81,18 @@ void *mymalloc(size_t requested){
         case NotSet:
             return NULL;
         case First:
-            fit = findFirstFit(requested);
-            return allocBlock(fit, requested);
+            fit = findFirstFit(requested);  break;
         case Best:
-            fit = findBestFit(requested);
-            return allocBlock(fit, requested);
+            fit = findBestFit(requested);   break;
         case Worst:
-            fit = findWorstFit(requested);
-            return allocBlock(fit, requested);
+            fit = findWorstFit(requested);  break;
         case Next:
-            fit = findNextFit(requested);
-            return allocBlock(fit, requested);
+            fit = findNextFit(requested);   break;
         default:
             return NULL;
     }
+
+    return allocBlock(fit, requested);
 }
 
 void *findFirstFit(size_t requested){
@@ -142,7 +134,6 @@ void *findWorstFit(size_t requested){
     return worst;
 }
 
-// TODO: bug
 void *findNextFit(size_t requested){
     if (lastAlloc != NULL) {
         temp = lastAlloc->next;
@@ -157,7 +148,7 @@ void *findNextFit(size_t requested){
     temp = head;
 
     // traverse from head till lastAlloc
-    while (temp != lastAlloc){
+    while (temp != NULL){
         if (temp->alloc == '0' && temp->size >= requested) return temp;
         temp = temp->next;
     }
@@ -171,20 +162,19 @@ void *allocBlock(struct memory_block *fit, size_t requested){
 
     int memo_remainder = fit->size - (int)requested;
 
-    if (memo_remainder > 0){
-        struct memory_block *freeBlock = (struct memory_block*) malloc(sizeof (struct memory_block));
-        freeBlock->ptr = fit->ptr + requested; // ensures correct offset
-        freeBlock->size = memo_remainder;
-        freeBlock->alloc = '0';
+    if (memo_remainder){
+        struct memory_block *newBlock = (struct memory_block*) malloc(sizeof (struct memory_block));
+        newBlock->ptr = fit->ptr + requested; // ensures correct offset
+        newBlock->size = memo_remainder;
+        newBlock->alloc = '0';
 
-        // position freeBlock to the right of fit
-        freeBlock->prev = fit;
-        freeBlock->next = fit->next;
+        // position newBlock to the right of fit
+        newBlock->prev = fit;
+        newBlock->next = fit->next;
 
-        if (fit->next != NULL)
-            fit->next->prev = freeBlock;
+        if (fit->next != NULL) fit->next->prev = newBlock;
 
-        fit->next = freeBlock;
+        fit->next = newBlock;
     }
 
     fit->alloc = '1';
@@ -228,7 +218,7 @@ void myfree(void* block){
             }
 
             temp->alloc = '0';
-            return;
+            break;
         }
         temp = temp->next;
     }
@@ -303,7 +293,7 @@ int mem_small_free(int size){
 char mem_is_alloc(void *ptr){
     temp = head;
     while (temp != NULL){
-        if (temp->ptr == ptr) return '1';
+        if (temp->ptr == ptr) return temp->alloc;
         temp = temp->next;
     }
     return '0';
@@ -430,32 +420,6 @@ void try_mymem(int argc, char **argv) {
     g = mymalloc(100);
     h = mymalloc(5);
 
-    /*
-    a = mymalloc(10);
-    b = mymalloc(2);
-    myfree(a);
-    c = mymalloc(1);
-    myfree(c);
-	d = mymalloc(3);
-    e = mymalloc(1);
-    myfree(d);
-    myfree(e);
-    g = mymalloc(90);
-    //myfree(a);
-    h = mymalloc(41);
-    k = mymalloc(39);
-    //myfree(k);
-    myfree(g);
-    //myfree(h);
-    f = mymalloc(495);
-    //myfree(e);
-
-    l = mymalloc(142);
-
-    myfree(b);
-     */
-
 	print_memory();
 	print_memory_status();
-	
 }
